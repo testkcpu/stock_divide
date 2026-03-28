@@ -18,6 +18,54 @@ import matplotlib.font_manager as fm
 from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 
+# ===================== 中文字体配置 =====================
+def setup_chinese_font():
+    """配置matplotlib中文字体支持(Linux环境)"""
+    # Linux系统常见中文字体路径
+    font_paths = [
+        '/usr/share/fonts/google-noto-cjk/NotoSansCJKsc-Regular.otf',  # Noto Sans CJK SC
+        '/usr/share/fonts/wqy/wqy-microhei.ttc',  # 文泉驿微米黑
+        '/usr/share/fonts/truetype/wqy/wqy-microhei.ttc',
+        '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+    ]
+    
+    font_found = False
+    for font_path in font_paths:
+        if os.path.exists(font_path):
+            try:
+                font_prop = fm.FontProperties(fname=font_path)
+                plt.rcParams['font.family'] = font_prop.get_name()
+                plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
+                print(f"✅ 已加载中文字体: {font_path}")
+                font_found = True
+                break
+            except Exception as e:
+                print(f"⚠️ 加载字体失败 {font_path}: {e}")
+                continue
+    
+    if not font_found:
+        # 尝试使用系统字体管理器查找中文字体
+        try:
+            # 查找包含CJK或中文的字体
+            fonts = [f for f in fm.findSystemFonts() if 'cjk' in f.lower() or 'noto' in f.lower() or 'wqy' in f.lower()]
+            if fonts:
+                font_prop = fm.FontProperties(fname=fonts[0])
+                plt.rcParams['font.family'] = font_prop.get_name()
+                plt.rcParams['axes.unicode_minus'] = False
+                print(f"✅ 已自动加载中文字体: {fonts[0]}")
+                font_found = True
+        except Exception as e:
+            print(f"⚠️ 自动查找字体失败: {e}")
+    
+    if not font_found:
+        print("⚠️ 警告: 未找到中文字体，图表中的中文可能显示为方块")
+        print("   建议安装: sudo apt-get install fonts-noto-cjk 或 fonts-wqy-microhei")
+    
+    return font_found
+
+# 初始化中文字体
+setup_chinese_font()
+
 # ===================== 高股息标的完整列表 =====================
 STOCK_LIST = [
     # ---- 电力 ----
@@ -210,9 +258,17 @@ def parse_quotes(raw_text):
 
 
 def _find_cjk_font():
-    """查找系统中可用的中文字体"""
-    # macOS 常见中文字体路径
+    """查找系统中可用的中文字体 (支持macOS和Linux)"""
+    # 按优先级排序的字体候选列表
     candidates = [
+        # Linux 中文字体
+        "/usr/share/fonts/google-noto-cjk/NotoSansCJKsc-Regular.otf",
+        "/usr/share/fonts/google-noto-cjk/NotoSansCJKsc-Bold.otf",
+        "/usr/share/fonts/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+        # macOS 中文字体
         "/System/Library/Fonts/STHeiti Light.ttc",
         "/System/Library/Fonts/STHeiti Medium.ttc",
         "/System/Library/Fonts/Hiragino Sans GB.ttc",
@@ -225,15 +281,24 @@ def _find_cjk_font():
     ]
     for fp in candidates:
         if os.path.exists(fp):
-            return fm.FontProperties(fname=fp)
+            try:
+                font_prop = fm.FontProperties(fname=fp)
+                print(f"✅ 图表使用字体: {os.path.basename(fp)}")
+                return font_prop
+            except Exception:
+                continue
+    
     # 兜底：尝试系统已注册的中文字体名
-    for name in ["PingFang SC", "Heiti SC", "STHeiti", "SimHei", "Microsoft YaHei"]:
+    for name in ["Noto Sans CJK SC", "WenQuanYi Micro Hei", "PingFang SC", "Heiti SC", "STHeiti", "SimHei", "Microsoft YaHei"]:
         try:
             fp = fm.FontProperties(family=name)
             if fm.findfont(fp) != fm.findfont("DejaVu Sans"):
+                print(f"✅ 图表使用系统字体: {name}")
                 return fp
         except Exception:
             pass
+    
+    print("⚠️ 警告: 未找到合适的中文字体，使用默认字体")
     return fm.FontProperties()
 
 
