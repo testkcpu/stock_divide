@@ -19,7 +19,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 
 # ===================== 高股息标的完整列表 =====================
-BANK_STOCKS = [
+STOCK_LIST = [
     # ---- 电力 ----
     ("sz003816", "中国广核"),
     ("sh601985", "中国核电"),
@@ -118,16 +118,21 @@ def fetch_tencent_quotes(codes):
         return ""
 
 
-def fetch_year_start_price(codes):
+def fetch_year_klines(codes):
     """
-    通过腾讯财经日K线接口获取年初第一个交易日的开盘价
+    一次查询获取从年初至今的全部日K线数据（合并原 fetch_year_start_price + fetch_recent_klines）
     接口: https://web.ifzq.gtimg.cn/appstock/app/fqkline/get
     参数: param=代码,day,开始日期,结束日期,数量,qfq
     K线格式: [日期, 开盘, 收盘, 最高, 最低, 成交量]
+
+    返回: {code: {
+        "year_start": {"date": ..., "open": ..., "close": ...},  # 年初第一个交易日
+        "kline_closes": [close_1, close_2, ...],                  # 年初至今全部收盘价
+    }, ...}
     """
     year = datetime.now().year
     start_date = f"{year}-01-01"
-    end_date = f"{year}-01-10"  # 取前10天足以覆盖第一个交易日
+    end_date = datetime.now().strftime("%Y-%m-%d")
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
                       "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -138,58 +143,28 @@ def fetch_year_start_price(codes):
     for code in codes:
         try:
             url = (f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
-                   f"?param={code},day,{start_date},{end_date},5,qfq")
+                   f"?param={code},day,{start_date},{end_date},500,qfq")
             resp = requests.get(url, headers=headers, timeout=10)
             data = resp.json()
             if data.get("code") == 0 and data.get("data"):
                 stock_data = data["data"].get(code, {})
                 klines = stock_data.get("qfqday", []) or stock_data.get("day", [])
                 if klines and len(klines) > 0:
-                    # 第一个交易日: [日期, 开盘, 收盘, 最高, 最低, 成交量]
+                    # 第一根K线 = 年初第一个交易日: [日期, 开盘, 收盘, 最高, 最低, 成交量]
                     first_day = klines[0]
+                    # 全部K线的收盘价 = 年初至今走势
+                    all_closes = [float(k[2]) for k in klines]
                     results[code] = {
-                        "date": first_day[0],
-                        "open": float(first_day[1]),   # 年初开盘价
-                        "close": float(first_day[2]),   # 年初收盘价
+                        "year_start": {
+                            "date": first_day[0],
+                            "open": float(first_day[1]),   # 年初开盘价
+                            "close": float(first_day[2]),  # 年初收盘价
+                        },
+                        "kline_closes": all_closes,
                     }
         except Exception:
             pass
         time.sleep(0.15)  # 控制请求频率
-    return results
-
-
-def fetch_recent_klines(codes, days=40):
-    """
-    获取最近N天的日K线收盘价数据，用于绘制走势缩略图
-    返回: {code: [close_price_1, close_price_2, ...], ...}
-    """
-    from datetime import timedelta
-    today = datetime.now()
-    # 多取一些日历天数以确保覆盖足够交易日
-    start_date = (today - timedelta(days=int(days * 1.8))).strftime("%Y-%m-%d")
-    end_date = today.strftime("%Y-%m-%d")
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Referer": "https://finance.qq.com/",
-    }
-    results = {}
-    for code in codes:
-        try:
-            url = (f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
-                   f"?param={code},day,{start_date},{end_date},{days + 10},qfq")
-            resp = requests.get(url, headers=headers, timeout=10)
-            data = resp.json()
-            if data.get("code") == 0 and data.get("data"):
-                stock_data = data["data"].get(code, {})
-                klines = stock_data.get("qfqday", []) or stock_data.get("day", [])
-                if klines:
-                    # 取最后 days 根K线的收盘价
-                    closes = [float(k[2]) for k in klines[-days:]]
-                    results[code] = closes
-        except Exception:
-            pass
-        time.sleep(0.15)
     return results
 
 
@@ -335,10 +310,10 @@ def generate_table_image(table_rows, output_path):
     has_score = any("eval_score" in r for r in table_rows)
     if has_score:
         col_headers = ["名称", "代码", "现价", "年初价",
-                       "年初至今", "股息率(TTM)", "评分", "评级", "走势(40日)", "PE", "PB", "市值(亿)"]
+                       "年初至今", "股息率(TTM)", "评分", "评级", "走势(年初至今)", "PE", "PB", "市值(亿)"]
     else:
         col_headers = ["名称", "代码", "现价", "年初价",
-                       "年初至今", "股息率(TTM)", "走势(40日)", "PE", "PB", "市值(亿)"]
+                       "年初至今", "股息率(TTM)", "走势(年初至今)", "PE", "PB", "市值(亿)"]
     n_cols = len(col_headers)
 
     # 走势列索引
@@ -446,7 +421,7 @@ def generate_table_image(table_rows, output_path):
             fontproperties=font_prop_bold, fontsize=20,
             ha="center", va="center", color="#1a2a4a")
     ax.text(0.5, title_y - 0.35,
-            f"数据来源: 腾讯财经  |  {now_str}  |  按板块分组, 板块内按股息率排序  |  含近40日走势",
+            f"数据来源: 腾讯财经  |  {now_str}  |  按板块分组, 板块内按股息率排序  |  含年初至今走势",
             fontproperties=font_prop, fontsize=10,
             ha="center", va="center", color="#666666")
 
@@ -622,7 +597,7 @@ def generate_table_image(table_rows, output_path):
     footer_text = (f"共{len(table_rows)}只标的  |  平均股息率 {avg_dv:.2f}%  |  "
                    f"≥6%: {ge6}只  ≥5%: {ge5}只  |  "
                    f"年初至今 ↑{up_cnt}只 ↓{dn_cnt}只  |  "
-                   f"涨=红色 跌=绿色  高股息=红底高亮  走势=近40交易日")
+                   f"涨=红色 跌=绿色  高股息=红底高亮  走势=年初至今")
     if has_score:
         scored_rows = [r for r in table_rows if r.get("eval_score", 0) > 0]
         avg_sc = sum(r["eval_score"] for r in scored_rows) / len(scored_rows) if scored_rows else 0
@@ -649,7 +624,7 @@ def generate_table_image(table_rows, output_path):
     print(f"🖼️  表格图片已保存至: {output_path}")
 
 
-def get_bank_dividend_table():
+def get_stock_dividend_table():
     """获取并展示高股息标的股息率表格"""
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -661,7 +636,7 @@ def get_bank_dividend_table():
 
     # ===== 批量获取实时行情(含股息率) =====
     print("\n⏳ 正在从腾讯财经获取实时行情数据...")
-    codes = [item[0] for item in BANK_STOCKS]
+    codes = [item[0] for item in STOCK_LIST]
 
     all_data = {}
     batch_size = 30
@@ -675,20 +650,15 @@ def get_bank_dividend_table():
 
     print(f"✅ 成功获取 {len(all_data)} 只标的实时数据")
 
-    # ===== 获取年初价格 =====
+    # ===== 获取年初至今K线(一次查询同时获取年初价格 + 走势数据) =====
     year = datetime.now().year
-    print(f"\n⏳ 正在获取 {year} 年初价格数据(逐只查询, 请耐心等待)...")
-    year_start_prices = fetch_year_start_price(codes)
-    print(f"✅ 成功获取 {len(year_start_prices)} 只标的年初价格")
-
-    # ===== 获取最近40天K线(走势图) =====
-    print(f"\n⏳ 正在获取最近40天K线数据(逐只查询, 用于走势图)...")
-    recent_klines = fetch_recent_klines(codes, days=40)
-    print(f"✅ 成功获取 {len(recent_klines)} 只标的近40日K线\n")
+    print(f"\n⏳ 正在获取 {year} 年初至今K线数据(逐只查询, 请耐心等待)...")
+    year_klines = fetch_year_klines(codes)
+    print(f"✅ 成功获取 {len(year_klines)} 只标的年初至今K线\n")
 
     # ===== 整合数据 =====
     table_rows = []
-    for code, expected_name in BANK_STOCKS:
+    for code, expected_name in STOCK_LIST:
         if code not in all_data:
             print(f"  [跳过] {expected_name}({code}) 未获取到数据")
             continue
@@ -726,15 +696,15 @@ def get_bank_dividend_table():
         ytd_price = 0.0
         ytd_change_pct = 0.0
         ytd_date = ""
-        if code in year_start_prices:
-            ysp = year_start_prices[code]
+        kline_closes = []
+        if code in year_klines:
+            yk = year_klines[code]
+            ysp = yk["year_start"]
             ytd_price = ysp["open"]  # 用年初第一个交易日开盘价
             ytd_date = ysp["date"]
             if ytd_price > 0:
                 ytd_change_pct = round((info["price"] - ytd_price) / ytd_price * 100, 2)
-
-        # 最近40天K线收盘价
-        kline_closes = recent_klines.get(code, [])
+            kline_closes = yk["kline_closes"]  # 年初至今全部收盘价
 
         table_rows.append({
             "name": info["name"],
@@ -933,7 +903,7 @@ def get_bank_dividend_table():
                       f"(最高 {max(dvs):.2f}%, 最低 {min(dvs):.2f}%, {len(dvs)}只){ytd_str}")
 
     # ===== 保存CSV =====
-    csv_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bank_dividend.csv")
+    csv_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stock_dividend.csv")
     try:
         with open(csv_file, "w", encoding="utf-8-sig") as f:
             f.write(f"排名,股票名称,股票代码,类型,现价(元),年初价格(元),年初至今涨跌幅%,"
@@ -956,7 +926,7 @@ def get_bank_dividend_table():
         print(f"\n[警告] CSV保存失败: {e}")
 
     # ===== 生成表格图片 =====
-    img_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bank_dividend.png")
+    img_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stock_dividend.png")
     print(f"\n⏳ 正在生成表格图片...")
     try:
         generate_table_image(table_rows, img_file)
@@ -974,4 +944,4 @@ def get_bank_dividend_table():
 
 
 if __name__ == "__main__":
-    get_bank_dividend_table()
+    get_stock_dividend_table()

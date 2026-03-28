@@ -14,8 +14,8 @@ import requests
 import re
 import time
 from datetime import datetime
-from bank_dividend import (
-    BANK_STOCKS, fetch_tencent_quotes, parse_quotes, fetch_year_start_price,
+from stock_dividend import (
+    STOCK_LIST, fetch_tencent_quotes, parse_quotes, fetch_year_klines,
 )
 
 SCORE_WEIGHTS = {
@@ -61,8 +61,9 @@ class DividendEvaluator:
         self.stock_data = parsed[stock_code]
         print(f"✅ {self.stock_data['name']}({self.stock_data['code']}) 现价:{self.stock_data['price']:.2f}")
         print(f"⏳ 获取年初价格...")
-        ytd = fetch_year_start_price([stock_code])
-        self.ytd_data = ytd.get(stock_code, {})
+        ytd = fetch_year_klines([stock_code])
+        ytd_info = ytd.get(stock_code, {})
+        self.ytd_data = ytd_info.get("year_start", {}) if ytd_info else {}
         if self.ytd_data:
             print(f"✅ 年初价: {self.ytd_data['open']:.2f}元")
         return self.stock_data
@@ -113,14 +114,14 @@ class DividendEvaluator:
 
     def fetch_peer_data(self, category):
         print(f"⏳ 获取同业对比数据...")
-        codes = [item[0] for item in BANK_STOCKS]
+        codes = [item[0] for item in STOCK_LIST]
         raw = fetch_tencent_quotes(codes)
         all_parsed = parse_quotes(raw)
-        for code, name in BANK_STOCKS:
+        for code, name in STOCK_LIST:
             if code in all_parsed:
                 info = all_parsed[code]
                 self.peer_data[code] = {**info, "category": self._get_category(info["name"])}
-        print(f"✅ 获取到 {len(self.peer_data)} 只银行数据")
+        print(f"✅ 获取到 {len(self.peer_data)} 只标的数据")
         return self.peer_data
 
     def _get_category(self, name):

@@ -7,7 +7,7 @@
   python evaluate_stock.py                    # 交互模式，手动输入代码
   python evaluate_stock.py sh601166           # 直接评估兴业银行
   python evaluate_stock.py sh601166 --image   # 评估并生成雷达图
-  python evaluate_stock.py --batch            # 批量评估所有银行并排名
+  python evaluate_stock.py --batch            # 批量评估所有标的并排名
 """
 
 import sys
@@ -15,7 +15,7 @@ import os
 import argparse
 from datetime import datetime
 from dividend_evaluator import DividendEvaluator, SCORE_WEIGHTS, BENCHMARKS
-from bank_dividend import BANK_STOCKS
+from stock_dividend import STOCK_LIST
 
 
 # ==================== 文本报告输出 ====================
@@ -125,7 +125,7 @@ def generate_radar_chart(report, output_path):
     import numpy as np
 
     # 查找中文字体
-    from bank_dividend import _find_cjk_font
+    from stock_dividend import _find_cjk_font
     font_prop = _find_cjk_font()
     font_prop_bold = font_prop.copy()
     font_prop_bold.set_weight("bold")
@@ -185,12 +185,12 @@ def generate_radar_chart(report, output_path):
 
 # ==================== 批量评估 ====================
 def batch_evaluate():
-    """批量评估所有银行并排名"""
+    """批量评估所有标的并排名"""
 
     results = []
-    total = len(BANK_STOCKS)
+    total = len(STOCK_LIST)
 
-    for i, (code, name) in enumerate(BANK_STOCKS, 1):
+    for i, (code, name) in enumerate(STOCK_LIST, 1):
         print(f"\n{'='*50}")
         print(f"[{i}/{total}] 评估 {name} ({code})...")
         try:
@@ -209,7 +209,7 @@ def batch_evaluate():
     print("📊 股息投资综合评估排行榜".center(80))
     print("=" * 90)
 
-    header = (f"{'排名':>4} │ {'银行':<10} │ {'代码':<8} │ {'综合评分':>8} │ {'评级':<20} │ "
+    header = (f"{'排名':>4} │ {'标的':<10} │ {'代码':<8} │ {'综合评分':>8} │ {'评级':<20} │ "
               f"{'股息率':>6} │ {'PE':>6} │ {'PB':>5}")
     print(header)
     print("─" * 90)
@@ -222,7 +222,7 @@ def batch_evaluate():
               f"{r['rating']:<20} │ {dy:>5.2f}% │ {pe:>6.2f} │ {pb:>5.2f}")
 
     print("─" * 90)
-    print(f"\n共评估 {len(results)} 只银行")
+    print(f"\n共评估 {len(results)} 只标的")
     if results:
         print(f"🥇 最佳: {results[0]['stock_name']} ({results[0]['total_score']:.1f}分)")
         print(f"🥈 第二: {results[1]['stock_name']} ({results[1]['total_score']:.1f}分)" if len(results) > 1 else "")
@@ -232,7 +232,7 @@ def batch_evaluate():
     csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "evaluation_ranking.csv")
     try:
         with open(csv_path, "w", encoding="utf-8-sig") as f:
-            f.write("排名,银行,代码,综合评分,评级,股息率,PE,PB\n")
+            f.write("排名,标的名称,代码,综合评分,评级,股息率,PE,PB\n")
             for i, r in enumerate(results, 1):
                 dy = r["scores"]["dividend_yield"]["detail"]["dividend_yield"]
                 pe = r["scores"]["valuation_safety"]["detail"]["pe"]
@@ -249,7 +249,7 @@ def batch_evaluate():
 # ==================== 股票代码映射 ====================
 # 方便用户直接输入简短代码
 CODE_MAP = {}
-for _code, _name in BANK_STOCKS:
+for _code, _name in STOCK_LIST:
     pure = _code[2:]
     CODE_MAP[pure] = _code
     CODE_MAP[_name] = _code
@@ -278,7 +278,7 @@ def main():
     parser.add_argument("stock_code", nargs="?", default=None,
                         help="股票代码，如 sh601166 或 601166 或 兴业银行")
     parser.add_argument("--image", action="store_true", help="生成雷达图")
-    parser.add_argument("--batch", action="store_true", help="批量评估所有银行")
+    parser.add_argument("--batch", action="store_true", help="批量评估所有标的")
     parser.add_argument("--output", "-o", default=None, help="图片输出路径")
     args = parser.parse_args()
 
@@ -294,7 +294,7 @@ def main():
         print("  • 腾讯代码: sh601166")
         print("  • 6位代码:  601166")
         print("  • 银行名称: 兴业银行")
-        print("  • 输入 'batch' 批量评估所有银行")
+        print("  • 输入 'batch' 批量评估所有标的")
         print("  • 输入 'quit' 退出")
         print("─" * 40)
 
