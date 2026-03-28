@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-国内上市银行股息率查询工具
+高股息标的股息率查询工具
 数据来源: 腾讯财经实时行情接口 (qt.gtimg.cn)
 说明: 直接从腾讯行情接口提取股息率(TTM)等核心指标
 """
@@ -18,55 +18,74 @@ import matplotlib.font_manager as fm
 from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 
-# ===================== 国内A股上市银行完整列表 =====================
+# ===================== 高股息标的完整列表 =====================
 BANK_STOCKS = [
-    # 六大国有银行
-    ("sh601398", "工商银行"),
-    ("sh601939", "建设银行"),
+    # ---- 电力 ----
+    ("sz003816", "中国广核"),
+    ("sh601985", "中国核电"),
+    ("sh600900", "长江电力"),
+    ("sh600025", "华能水电"),
+    ("sh600886", "国投电力"),
+    ("sh600674", "川投能源"),
+    ("sh600863", "内蒙华电"),
+    ("sh600023", "浙能电力"),
+    ("sh600795", "国电电力"),
+    # ---- 银行 ----
     ("sh601288", "农业银行"),
+    ("sh601398", "工商银行"),
+    ("sz002142", "宁波银行"),
+    ("sh600036", "招商银行"),
     ("sh601988", "中国银行"),
+    ("sh601939", "建设银行"),
     ("sh601328", "交通银行"),
     ("sh601658", "邮储银行"),
-    # 股份制商业银行
-    ("sh600036", "招商银行"),
-    ("sh600016", "民生银行"),
-    ("sh600000", "浦发银行"),
-    ("sz000001", "平安银行"),
-    ("sh601166", "兴业银行"),
-    ("sz002142", "宁波银行"),
-    ("sh601818", "光大银行"),
-    ("sh600015", "华夏银行"),
-    ("sh601998", "中信银行"),
-    # 城商行 & 农商行
+    ("sh601838", "成都银行"),
     ("sh600919", "江苏银行"),
     ("sh601169", "北京银行"),
+    ("sz000001", "平安银行"),
     ("sh600926", "杭州银行"),
-    ("sh601009", "南京银行"),
-    ("sh601916", "浙商银行"),
-    ("sh601838", "成都银行"),
-    ("sh601577", "长沙银行"),
-    ("sh601963", "重庆银行"),
-    ("sh601997", "贵阳银行"),
-    ("sz002948", "青岛银行"),
-    ("sh601187", "厦门银行"),
-    ("sh600928", "西安银行"),
-    ("sh601665", "齐鲁银行"),
-    ("sz001227", "兰州银行"),
-    ("sh601077", "渝农商行"),
-    ("sh601825", "沪农商行"),
-    ("sh601528", "瑞丰银行"),
-    ("sh601860", "紫金银行"),
-    ("sh600908", "无锡银行"),
-    ("sh601128", "常熟银行"),
-    ("sh603323", "苏农银行"),
-    ("sz002839", "张家港行"),
-    ("sz002807", "江阴银行"),
-    ("sz002936", "郑州银行"),
-    ("sz002966", "苏州银行"),
-
-
-    ("sh601919","中远海控"),
-    ("sh600900","长江电力"),
+    ("sh601166", "兴业银行"),
+    ("sh601818", "光大银行"),
+    ("sh600015", "华夏银行"),
+    ("sh600016", "民生银行"),
+    # ---- 保险 ----
+    ("sh601318", "中国平安"),
+    ("sh601601", "中国太保"),
+    # ---- 白酒 ----
+    ("sh600519", "贵州茅台"),
+    ("sz000858", "五粮液"),
+    ("sz000568", "泸州老窖"),
+    ("sh600809", "山西汾酒"),
+    # ---- 通讯 ----
+    ("sh600941", "中国移动"),
+    ("sh601728", "中国电信"),
+    # ---- 运输 ----
+    ("sh601919", "中远海控"),
+    ("sh601006", "大秦铁路"),
+    ("sh603565", "中谷物流"),
+    ("sh601107", "四川成渝"),
+    ("sz001965", "招商公路"),
+    # ---- 医疗器械 ----
+    ("sz300760", "迈瑞医疗"),
+    # ---- 传媒 ----
+    ("sz002027", "分众传媒"),
+    # ---- 食品饮料 ----
+    ("sh600887", "伊利股份"),
+    ("sz000895", "双汇发展"),
+    # ---- 家电 ----
+    ("sz000333", "美的集团"),
+    ("sz000651", "格力电器"),
+    ("sh600699", "海尔智家"),
+    # ---- 煤炭油气 ----
+    ("sh601088", "中国神华"),
+    ("sh600938", "中国海油"),
+    # ---- 小家电 ----
+    ("sz002032", "苏泊尔"),
+    # ---- 中药 ----
+    ("sz000538", "云南白药"),
+    ("sz000423", "东阿阿胶"),
+    # ---- 服装家纺 ----
+    ("sh603558", "健盛集团"),
 ]
 
 
@@ -301,7 +320,7 @@ def _draw_sparkline(ax, x, y, width, height, closes, fig, fig_height):
 
 def generate_table_image(table_rows, output_path):
     """
-    将银行股息率数据生成一张精美的表格图片
+    将股息率数据生成一张精美的表格图片
     table_rows: 已按股息率降序排好的数据列表 (每个 row 需含 'kline_closes' 字段)
     output_path: 图片保存路径
     """
@@ -315,58 +334,84 @@ def generate_table_image(table_rows, output_path):
     # ---------- 准备表格数据 ----------
     has_score = any("eval_score" in r for r in table_rows)
     if has_score:
-        col_headers = ["排名", "银行", "代码", "现价", "年初价",
-                       "年初至今", "股息率(TTM)", "评分", "评级", "PE", "PB", "市值(亿)", "走势(40日)", "类型"]
+        col_headers = ["名称", "代码", "现价", "年初价",
+                       "年初至今", "股息率(TTM)", "评分", "评级", "走势(40日)", "PE", "PB", "市值(亿)"]
     else:
-        col_headers = ["排名", "银行", "代码", "现价", "年初价",
-                       "年初至今", "股息率(TTM)", "PE", "PB", "市值(亿)", "走势(40日)", "类型"]
+        col_headers = ["名称", "代码", "现价", "年初价",
+                       "年初至今", "股息率(TTM)", "走势(40日)", "PE", "PB", "市值(亿)"]
     n_cols = len(col_headers)
-    n_rows = len(table_rows)
 
     # 走势列索引
-    sparkline_col_idx = 12 if has_score else 10
+    sparkline_col_idx = 8 if has_score else 6
 
-    cell_texts = []
-    for i, row in enumerate(table_rows, 1):
-        ytd_price_str = f"{row['ytd_price']:.2f}" if row["ytd_price"] > 0 else "--"
-        ytd_chg_str = f"{row['ytd_change_pct']:+.2f}%" if row["ytd_price"] > 0 else "--"
-        dv_str = f"{row['dividend_yield']:.2f}%"
-        mv_str = f"{row['total_mv']:.0f}" if row["total_mv"] >= 1 else f"{row['total_mv']:.2f}"
+    # ---------- 构建带板块分隔行的渲染列表 ----------
+    # render_items: list of dict, type="section_header" 或 type="data"
+    render_items = []
+    from collections import OrderedDict as _OD
+    cat_groups = _OD()
+    for row in table_rows:
+        cat = row["category"]
+        if cat not in cat_groups:
+            cat_groups[cat] = []
+        cat_groups[cat].append(row)
 
-        if has_score:
-            score_val = row.get("eval_score", 0)
-            rating_val = row.get("eval_rating", "--")
-            cell_texts.append([
-                str(i),
-                row["name"],
-                row["code"],
-                f"{row['price']:.2f}",
-                ytd_price_str,
-                ytd_chg_str,
-                dv_str,
-                f"{score_val:.1f}" if score_val > 0 else "--",
-                rating_val,
-                f"{row['pe']:.2f}",
-                f"{row['pb']:.2f}",
-                mv_str,
-                "",  # 走势列占位
-                row["category"],
-            ])
-        else:
-            cell_texts.append([
-                str(i),
-                row["name"],
-                row["code"],
-                f"{row['price']:.2f}",
-                ytd_price_str,
-                ytd_chg_str,
-                dv_str,
-                f"{row['pe']:.2f}",
-                f"{row['pb']:.2f}",
-                mv_str,
-                "",  # 走势列占位，由 sparkline 绘制
-                row["category"],
-            ])
+    rank = 0
+    for cat, rows_in_cat in cat_groups.items():
+        # 板块标题行
+        cat_avg_dv = sum(r["dividend_yield"] for r in rows_in_cat) / len(rows_in_cat)
+        render_items.append({
+            "type": "section_header",
+            "category": cat,
+            "count": len(rows_in_cat),
+            "avg_dv": cat_avg_dv,
+        })
+        for row in rows_in_cat:
+            rank += 1
+            ytd_price_str = f"{row['ytd_price']:.2f}" if row["ytd_price"] > 0 else "--"
+            ytd_chg_str = f"{row['ytd_change_pct']:+.2f}%" if row["ytd_price"] > 0 else "--"
+            dv_str = f"{row['dividend_yield']:.2f}%"
+            mv_str = f"{row['total_mv']:.0f}" if row["total_mv"] >= 1 else f"{row['total_mv']:.2f}"
+
+            if has_score:
+                score_val = row.get("eval_score", 0)
+                rating_val = row.get("eval_rating", "--")
+                cells = [
+                    row["name"],
+                    row["code"],
+                    f"{row['price']:.2f}",
+                    ytd_price_str,
+                    ytd_chg_str,
+                    dv_str,
+                    f"{score_val:.1f}" if score_val > 0 else "--",
+                    rating_val,
+                    "",  # 走势列占位
+                    f"{row['pe']:.2f}",
+                    f"{row['pb']:.2f}",
+                    mv_str,
+                ]
+            else:
+                cells = [
+                    row["name"],
+                    row["code"],
+                    f"{row['price']:.2f}",
+                    ytd_price_str,
+                    ytd_chg_str,
+                    dv_str,
+                    "",  # 走势列占位
+                    f"{row['pe']:.2f}",
+                    f"{row['pb']:.2f}",
+                    mv_str,
+                ]
+            render_items.append({
+                "type": "data",
+                "row": row,
+                "cells": cells,
+                "rank": rank,
+            })
+
+    n_data_rows = sum(1 for it in render_items if it["type"] == "data")
+    n_section_rows = sum(1 for it in render_items if it["type"] == "section_header")
+    n_total_visual_rows = n_data_rows + n_section_rows
 
     # ---------- 颜色方案 ----------
     header_bg = "#1a2a4a"
@@ -377,17 +422,16 @@ def generate_table_image(table_rows, output_path):
 
     # ---------- 计算尺寸 ----------
     if has_score:
-        # 14列: 排名, 银行, 代码, 现价, 年初价, 年初至今, 股息率, 评分, 评级, PE, PB, 市值, 走势, 类型
-        col_widths = [0.030, 0.065, 0.065, 0.050, 0.050, 0.070, 0.080, 0.050, 0.085, 0.050, 0.050, 0.065, 0.110, 0.075]
+        col_widths = [0.075, 0.068, 0.058, 0.058, 0.078, 0.088, 0.058, 0.088, 0.125, 0.058, 0.058, 0.073]
     else:
-        # 12列: 排名, 银行, 代码, 现价, 年初价, 年初至今, 股息率, PE, PB, 市值, 走势, 类型
-        col_widths = [0.035, 0.075, 0.075, 0.06, 0.06, 0.085, 0.10, 0.06, 0.06, 0.075, 0.13, 0.085]
+        col_widths = [0.085, 0.080, 0.070, 0.070, 0.095, 0.110, 0.150, 0.070, 0.070, 0.085]
     fig_width = 20 if has_score else 18
     row_height = 0.42
+    section_header_height = 0.36  # 板块标题行高度
     header_height = 0.48
     title_height = 1.0
     footer_height = 0.6
-    table_height = header_height + n_rows * row_height
+    table_height = header_height + n_data_rows * row_height + n_section_rows * section_header_height
     fig_height = title_height + table_height + footer_height
 
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
@@ -398,11 +442,11 @@ def generate_table_image(table_rows, output_path):
 
     # ---------- 标题区域 ----------
     title_y = fig_height - title_height * 0.45
-    ax.text(0.5, title_y, f"国内上市银行股息率(TTM)排行榜",
+    ax.text(0.5, title_y, f"高股息标的股息率(TTM)排行榜",
             fontproperties=font_prop_bold, fontsize=20,
             ha="center", va="center", color="#1a2a4a")
     ax.text(0.5, title_y - 0.35,
-            f"数据来源: 腾讯财经  |  {now_str}  |  按股息率从高到低排序  |  含近40日走势",
+            f"数据来源: 腾讯财经  |  {now_str}  |  按板块分组, 板块内按股息率排序  |  含近40日走势",
             fontproperties=font_prop, fontsize=10,
             ha="center", va="center", color="#666666")
 
@@ -426,16 +470,42 @@ def generate_table_image(table_rows, output_path):
     # 收集需要绘制sparkline的单元格位置信息
     sparkline_tasks = []
 
-    for i, (row, cells) in enumerate(zip(table_rows, cell_texts)):
-        row_y = table_top - header_height - (i + 1) * row_height
-        bg = row_bg_even if i % 2 == 0 else row_bg_odd
+    # 板块标题行颜色
+    section_bg = "#E8EDF5"
+    section_fg = "#1a2a4a"
+
+    current_y = table_top - header_height
+    data_row_idx = 0  # 用于交替行颜色
+
+    for item in render_items:
+        if item["type"] == "section_header":
+            # 绘制板块标题行
+            row_y = current_y - section_header_height
+            total_w = sum(col_widths)
+            rect = plt.Rectangle((0, row_y), total_w, section_header_height,
+                                  facecolor=section_bg, edgecolor=grid_color, linewidth=0.5)
+            ax.add_patch(rect)
+            section_label = f"▎{item['category']}  ({item['count']}只, 均值 {item['avg_dv']:.2f}%)"
+            ax.text(0.015, row_y + section_header_height / 2, section_label,
+                    fontproperties=font_prop_bold, fontsize=10,
+                    ha="left", va="center", color=section_fg)
+            current_y = row_y
+            data_row_idx = 0  # 每个板块重新开始交替颜色
+            continue
+
+        # 绘制数据行
+        row = item["row"]
+        cells = item["cells"]
+        row_y = current_y - row_height
+        bg = row_bg_even if data_row_idx % 2 == 0 else row_bg_odd
+        data_row_idx += 1
 
         x_pos = 0.0
         for j, (cell, w) in enumerate(zip(cells, col_widths)):
             cell_bg = bg
 
             # 股息率列特殊着色
-            if j == 6:
+            if j == 5:
                 dv = row["dividend_yield"]
                 if dv >= 6:
                     cell_bg = "#FDEAEA"
@@ -447,7 +517,7 @@ def generate_table_image(table_rows, output_path):
                     cell_bg = bg
 
             # 评分列特殊着色
-            if has_score and j == 7:
+            if has_score and j == 6:
                 sv = row.get("eval_score", 0)
                 if sv >= 85:
                     cell_bg = "#FDEAEA"   # 深红底
@@ -480,7 +550,7 @@ def generate_table_image(table_rows, output_path):
             fw = font_prop
 
             # 年初至今列: 涨红跌绿
-            if j == 5 and cell != "--":
+            if j == 4 and cell != "--":
                 val = row["ytd_change_pct"]
                 if val > 0:
                     text_color = "#D32F2F"
@@ -488,7 +558,7 @@ def generate_table_image(table_rows, output_path):
                     text_color = "#2E7D32"
 
             # 股息率列: 高亮
-            if j == 6:
+            if j == 5:
                 dv = row["dividend_yield"]
                 if dv >= 6:
                     text_color = "#C62828"
@@ -498,7 +568,7 @@ def generate_table_image(table_rows, output_path):
                     fw = font_prop_bold
 
             # 评分列: 高分高亮
-            if has_score and j == 7:
+            if has_score and j == 6:
                 sv = row.get("eval_score", 0)
                 if sv >= 85:
                     text_color = "#C62828"
@@ -510,7 +580,7 @@ def generate_table_image(table_rows, output_path):
                     text_color = "#F57F17"
 
             # 评级列: 着色
-            if has_score and j == 8:
+            if has_score and j == 7:
                 sv = row.get("eval_score", 0)
                 if sv >= 80:
                     text_color = "#C62828"
@@ -520,21 +590,18 @@ def generate_table_image(table_rows, output_path):
                 elif sv >= 60:
                     text_color = "#F57F17"
 
-            # 排名列前3高亮
-            if j == 0 and i < 3:
-                text_color = "#C62828"
-                fw = font_prop_bold
-
             ax.text(x_pos + w / 2, row_y + row_height / 2, cell,
                     fontproperties=fw, fontsize=9.5,
                     ha="center", va="center", color=text_color)
             x_pos += w
 
+        current_y = row_y
+
     # ---------- 表格外框 ----------
     total_w = sum(col_widths)
-    table_bottom = table_top - header_height - n_rows * row_height
+    table_bottom = current_y
     border = plt.Rectangle((0, table_bottom), total_w,
-                            header_height + n_rows * row_height,
+                            table_top - header_height - table_bottom + header_height,
                             facecolor="none", edgecolor="#1a2a4a", linewidth=1.5)
     ax.add_patch(border)
 
@@ -552,7 +619,7 @@ def generate_table_image(table_rows, output_path):
     up_cnt = sum(1 for r in ytd_valid if r["ytd_change_pct"] > 0)
     dn_cnt = sum(1 for r in ytd_valid if r["ytd_change_pct"] < 0)
 
-    footer_text = (f"共{len(table_rows)}只银行  |  平均股息率 {avg_dv:.2f}%  |  "
+    footer_text = (f"共{len(table_rows)}只标的  |  平均股息率 {avg_dv:.2f}%  |  "
                    f"≥6%: {ge6}只  ≥5%: {ge5}只  |  "
                    f"年初至今 ↑{up_cnt}只 ↓{dn_cnt}只  |  "
                    f"涨=红色 跌=绿色  高股息=红底高亮  走势=近40交易日")
@@ -583,12 +650,12 @@ def generate_table_image(table_rows, output_path):
 
 
 def get_bank_dividend_table():
-    """获取并展示银行股股息率表格"""
+    """获取并展示高股息标的股息率表格"""
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     print()
     print("╔" + "═" * 96 + "╗")
-    print("║" + "国内上市银行股息率(TTM)排行榜".center(80) + "║")
+    print("║" + "高股息标的股息率(TTM)排行榜".center(80) + "║")
     print("║" + f"数据来源: 腾讯财经 (qt.gtimg.cn)  |  更新时间: {now_str}".center(86) + "║")
     print("╚" + "═" * 96 + "╝")
 
@@ -606,18 +673,18 @@ def get_bank_dividend_table():
         if i + batch_size < len(codes):
             time.sleep(0.3)
 
-    print(f"✅ 成功获取 {len(all_data)} 只银行股实时数据")
+    print(f"✅ 成功获取 {len(all_data)} 只标的实时数据")
 
     # ===== 获取年初价格 =====
     year = datetime.now().year
     print(f"\n⏳ 正在获取 {year} 年初价格数据(逐只查询, 请耐心等待)...")
     year_start_prices = fetch_year_start_price(codes)
-    print(f"✅ 成功获取 {len(year_start_prices)} 只银行年初价格")
+    print(f"✅ 成功获取 {len(year_start_prices)} 只标的年初价格")
 
     # ===== 获取最近40天K线(走势图) =====
     print(f"\n⏳ 正在获取最近40天K线数据(逐只查询, 用于走势图)...")
     recent_klines = fetch_recent_klines(codes, days=40)
-    print(f"✅ 成功获取 {len(recent_klines)} 只银行近40日K线\n")
+    print(f"✅ 成功获取 {len(recent_klines)} 只标的近40日K线\n")
 
     # ===== 整合数据 =====
     table_rows = []
@@ -629,15 +696,31 @@ def get_bank_dividend_table():
 
         dv_yield = info["dividend_yield"]
 
-        # 分类: 国有大行 / 股份行 / 城商行&农商行
-        category = "城商行&农商行"
-        big6 = ["工商银行", "建设银行", "农业银行", "中国银行", "交通银行", "邮储银行"]
-        share_banks = ["招商银行", "民生银行", "浦发银行", "平安银行", "兴业银行",
-                       "宁波银行", "光大银行", "华夏银行", "中信银行"]
-        if info["name"] in big6:
-            category = "国有大行"
-        elif info["name"] in share_banks:
-            category = "股份制银行"
+        # 分类: 按板块归类
+        _category_map = {
+            "中国广核": "电力", "中国核电": "电力", "长江电力": "电力", "华能水电": "电力",
+            "国投电力": "电力", "川投能源": "电力", "内蒙华电": "电力", "浙能电力": "电力",
+            "国电电力": "电力",
+            "农业银行": "银行", "工商银行": "银行", "宁波银行": "银行", "招商银行": "银行",
+            "中国银行": "银行", "建设银行": "银行", "交通银行": "银行", "邮储银行": "银行",
+            "成都银行": "银行", "江苏银行": "银行", "北京银行": "银行", "平安银行": "银行",
+            "杭州银行": "银行", "兴业银行": "银行", "光大银行": "银行", "华夏银行": "银行",
+            "民生银行": "银行",
+            "中国平安": "保险", "中国太保": "保险",
+            "贵州茅台": "白酒", "五粮液": "白酒", "泸州老窖": "白酒", "山西汾酒": "白酒",
+            "中国移动": "通讯", "中国电信": "通讯",
+            "中远海控": "运输", "大秦铁路": "运输", "中谷物流": "运输", "四川成渝": "运输",
+            "招商公路": "运输",
+            "迈瑞医疗": "医疗器械",
+            "分众传媒": "传媒",
+            "伊利股份": "食品饮料", "双汇发展": "食品饮料",
+            "美的集团": "家电", "格力电器": "家电", "海尔智家": "家电",
+            "中国神华": "煤炭油气", "中国海油": "煤炭油气",
+            "苏泊尔": "小家电",
+            "云南白药": "中药", "东阿阿胶": "中药",
+            "健盛集团": "服装家纺",
+        }
+        category = _category_map.get(info["name"], "其他")
 
         # 年初价格和年初至今涨跌幅
         ytd_price = 0.0
@@ -673,8 +756,22 @@ def get_bank_dividend_table():
             "kline_closes": kline_closes,
         })
 
-    # 按股息率降序排列
-    table_rows.sort(key=lambda x: x["dividend_yield"], reverse=True)
+    # 按板块分组，板块内按股息率降序排列
+    # 1. 计算每个板块的平均股息率，用于板块间排序
+    from collections import defaultdict as _defaultdict
+    _cat_rows = _defaultdict(list)
+    for row in table_rows:
+        _cat_rows[row["category"]].append(row)
+    # 2. 板块按平均股息率降序
+    _cat_order = sorted(_cat_rows.keys(),
+                        key=lambda c: sum(r["dividend_yield"] for r in _cat_rows[c]) / len(_cat_rows[c]),
+                        reverse=True)
+    # 3. 板块内按股息率降序
+    sorted_rows = []
+    for cat in _cat_order:
+        rows_in_cat = sorted(_cat_rows[cat], key=lambda x: x["dividend_yield"], reverse=True)
+        sorted_rows.extend(rows_in_cat)
+    table_rows = sorted_rows
 
     # ===== 批量评估(评分) =====
     print(f"⏳ 正在进行综合评分(逐只评估)...")
@@ -727,52 +824,65 @@ def get_bank_dividend_table():
                 row["eval_score"] = 0
                 row["eval_rating"] = "--"
         scored = [r for r in table_rows if r.get("eval_score", 0) > 0]
-        print(f"✅ 成功评分 {len(scored)} 只银行")
+        print(f"✅ 成功评分 {len(scored)} 只标的")
     except ImportError:
         print(f"⚠️ 未找到评估模块，跳过评分")
 
-    # ===== 打印表格 =====
+    # ===== 打印表格(按板块分组) =====
     has_score_col = any(r.get("eval_score", 0) > 0 for r in table_rows)
     if has_score_col:
-        header = (f"{'排名':>4} │ {'银行名称':<10} │ {'代码':<8} │ {'现价':>7} │ {'年初价':>7} │ {'年初至今':>8} │ "
-                  f"{'股息率%':>7} │ {'评分':>5} │ {'评级':<6} │ {'PE(动)':>7} │ {'PB':>6} │ {'总市值(亿)':>10} │ {'类型':<12}")
-        sep = "─" * 152
+        header = (f"{'股票名称':<10} │ {'代码':<8} │ {'现价':>7} │ {'年初价':>7} │ {'年初至今':>8} │ "
+                  f"{'股息率%':>7} │ {'评分':>5} │ {'评级':<6} │ {'PE(动)':>7} │ {'PB':>6} │ {'总市值(亿)':>10}")
+        sep = "─" * 130
     else:
-        header = (f"{'排名':>4} │ {'银行名称':<10} │ {'代码':<8} │ {'现价':>7} │ {'年初价':>7} │ {'年初至今':>8} │ "
-                  f"{'股息率%':>7} │ {'PE(动)':>7} │ {'PB':>6} │ {'总市值(亿)':>10} │ {'类型':<12}")
-        sep = "─" * 126
+        header = (f"{'股票名称':<10} │ {'代码':<8} │ {'现价':>7} │ {'年初价':>7} │ {'年初至今':>8} │ "
+                  f"{'股息率%':>7} │ {'PE(动)':>7} │ {'PB':>6} │ {'总市值(亿)':>10}")
+        sep = "─" * 104
     print(sep)
     print(header)
     print(sep)
 
-    for i, row in enumerate(table_rows, 1):
-        mv_str = f"{row['total_mv']:.0f}" if row["total_mv"] >= 1 else f"{row['total_mv']:.2f}"
-        dv_str = f"{row['dividend_yield']:.2f}" if row["dividend_yield"] > 0 else "  --"
-        ytd_price_str = f"{row['ytd_price']:.2f}" if row["ytd_price"] > 0 else "   --"
-        ytd_chg_str = f"{row['ytd_change_pct']:+.2f}%" if row["ytd_price"] > 0 else "    --"
+    from collections import OrderedDict as _OD2
+    _cat_groups2 = _OD2()
+    for row in table_rows:
+        cat = row["category"]
+        if cat not in _cat_groups2:
+            _cat_groups2[cat] = []
+        _cat_groups2[cat].append(row)
 
-        # 高亮高股息行
-        marker = ""
-        if row["dividend_yield"] >= 6:
-            marker = " 🔥"
-        elif row["dividend_yield"] >= 5:
-            marker = " ⭐"
+    rank = 0
+    for cat, rows_in_cat in _cat_groups2.items():
+        cat_avg_dv = sum(r["dividend_yield"] for r in rows_in_cat) / len(rows_in_cat)
+        print(f"  ▎{cat} ({len(rows_in_cat)}只, 均值 {cat_avg_dv:.2f}%)")
+        for row in rows_in_cat:
+            rank += 1
+            mv_str = f"{row['total_mv']:.0f}" if row["total_mv"] >= 1 else f"{row['total_mv']:.2f}"
+            dv_str = f"{row['dividend_yield']:.2f}" if row["dividend_yield"] > 0 else "  --"
+            ytd_price_str = f"{row['ytd_price']:.2f}" if row["ytd_price"] > 0 else "   --"
+            ytd_chg_str = f"{row['ytd_change_pct']:+.2f}%" if row["ytd_price"] > 0 else "    --"
 
-        # 年初至今涨跌幅颜色标记
-        ytd_marker = ""
-        if row["ytd_change_pct"] >= 10:
-            ytd_marker = "📈"
-        elif row["ytd_change_pct"] <= -10:
-            ytd_marker = "📉"
+            # 高亮高股息行
+            marker = ""
+            if row["dividend_yield"] >= 6:
+                marker = " 🔥"
+            elif row["dividend_yield"] >= 5:
+                marker = " ⭐"
 
-        print(f"{i:>4} │ {row['name']:<10} │ {row['code']:<8} │ {row['price']:>7.2f} │ {ytd_price_str:>7} │ {ytd_chg_str:>7}{ytd_marker:<1}│ "
-              f"{dv_str:>7}{marker:<3}│ ", end="")
-        if has_score_col:
-            sc = row.get("eval_score", 0)
-            sr = row.get("eval_rating", "--")
-            sc_str = f"{sc:.1f}" if sc > 0 else "  --"
-            print(f"{sc_str:>5} │ {sr:<6} │ ", end="")
-        print(f"{row['pe']:>7.2f} │ {row['pb']:>6.2f} │ {mv_str:>10} │ {row['category']:<12}")
+            # 年初至今涨跌幅颜色标记
+            ytd_marker = ""
+            if row["ytd_change_pct"] >= 10:
+                ytd_marker = "📈"
+            elif row["ytd_change_pct"] <= -10:
+                ytd_marker = "📉"
+
+            print(f"{row['name']:<10} │ {row['code']:<8} │ {row['price']:>7.2f} │ {ytd_price_str:>7} │ {ytd_chg_str:>7}{ytd_marker:<1}│ "
+                  f"{dv_str:>7}{marker:<3}│ ", end="")
+            if has_score_col:
+                sc = row.get("eval_score", 0)
+                sr = row.get("eval_rating", "--")
+                sc_str = f"{sc:.1f}" if sc > 0 else "  --"
+                print(f"{sc_str:>5} │ {sr:<6} │ ", end="")
+            print(f"{row['pe']:>7.2f} │ {row['pb']:>6.2f} │ {mv_str:>10}")
 
     print(sep)
 
@@ -794,7 +904,7 @@ def get_bank_dividend_table():
             if r["ytd_price"] > 0:
                 cat_stats[cat]["ytd"].append(r["ytd_change_pct"])
 
-        print(f"\n📊 统计摘要 (共 {len(table_rows)} 只银行股):")
+        print(f"\n📊 统计摘要 (共 {len(table_rows)} 只标的):")
         print(f"   {'整体平均股息率:':<20} {avg_dv:.2f}%")
         print(f"   {'最高股息率:':<20} {max_dv['name']} ({max_dv['dividend_yield']:.2f}%)")
         print(f"   {'最低股息率:':<20} {min_dv['name']} ({min_dv['dividend_yield']:.2f}%)")
@@ -814,7 +924,7 @@ def get_bank_dividend_table():
             print(f"   {'年初至今下跌:':<20} {sum(1 for r in ytd_rows if r['ytd_change_pct'] < 0)} 只")
 
         print(f"\n📈 分类统计:")
-        for cat in ["国有大行", "股份制银行", "城商行&农商行"]:
+        for cat in sorted(cat_stats.keys(), key=lambda c: -sum(cat_stats[c]["dv"])/len(cat_stats[c]["dv"])):
             if cat in cat_stats:
                 dvs = cat_stats[cat]["dv"]
                 ytds = cat_stats[cat]["ytd"]
@@ -826,7 +936,7 @@ def get_bank_dividend_table():
     csv_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bank_dividend.csv")
     try:
         with open(csv_file, "w", encoding="utf-8-sig") as f:
-            f.write(f"排名,银行名称,股票代码,类型,现价(元),年初价格(元),年初至今涨跌幅%,"
+            f.write(f"排名,股票名称,股票代码,类型,现价(元),年初价格(元),年初至今涨跌幅%,"
                     f"股息率%(TTM),综合评分,评级,"
                     f"市盈率PE(动态),市净率PB,总市值(亿元),52周最高,52周最低\n")
             for i, row in enumerate(table_rows, 1):
